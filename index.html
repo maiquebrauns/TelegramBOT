@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Promo Bot - Painel de Controle</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            background-color: #1e1e1e;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
+            width: 100%;
+            max-width: 500px;
+            text-align: center;
+        }
+
+        h1 {
+            color: #ffe600;
+            margin-bottom: 20px;
+        }
+
+        input {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            margin-bottom: 20px;
+            box-sizing: border-box;
+            background: #2c2c2c;
+            color: white;
+        }
+
+        input:focus {
+            outline: 2px solid #ffe600;
+        }
+
+        button {
+            background-color: #3483fa;
+            color: white;
+            border: none;
+            padding: 15px;
+            width: 100%;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        button:hover {
+            background-color: #2968c8;
+        }
+
+        button:disabled {
+            background-color: #555;
+            cursor: not-allowed;
+        }
+
+        #status {
+            margin-top: 20px;
+            font-size: 14px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .sucesso {
+            background-color: #1b4332;
+            color: #74c69d;
+            border: 1px solid #2d6a4f;
+        }
+
+        .erro {
+            background-color: #4a1515;
+            color: #ff8787;
+            border: 1px solid #8c2929;
+        }
+
+        .carregando {
+            background-color: #332d00;
+            color: #ffe600;
+            border: 1px solid #665a00;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <h1>🤖 Buscador de Ofertas</h1>
+        <p>Digite o produto para extrair, gerar link e enviar ao Telegram.</p>
+
+        <input type="text" id="termoBusca" placeholder="Ex: iphone 15 ou cole um link do Mercado Livre..."
+            onkeypress="verificarEnter(event)"> <button id="btnBuscar" onclick="iniciarBusca()">🔎 Buscar e
+            Publicar</button>
+
+        <div id="status"></div>
+    </div>
+
+    <script>
+        function verificarEnter(event) {
+            if (event.key === "Enter") iniciarBusca();
+        }
+
+        async function iniciarBusca() {
+            const termo = document.getElementById('termoBusca').value.trim();
+            const btn = document.getElementById('btnBuscar');
+            const statusBox = document.getElementById('status');
+
+            if (!termo) {
+                mostrarStatus("erro", "Por favor, digite um produto!");
+                return;
+            }
+
+            // Altera visual para carregando
+            btn.disabled = true;
+            btn.innerText = "⏳ Processando no robô invisível...";
+            mostrarStatus("carregando", `A extrair ofertas para "${termo}"... Aguarde.`);
+
+            try {
+                const resposta = await fetch('/api/buscar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ termo })
+                });
+
+                const dados = await resposta.json();
+
+                if (dados.sucesso) {
+                    mostrarStatus("sucesso", `✅ SUCESSO!<br><br><b>Produto:</b> ${dados.produto.titulo}<br><b>Preço:</b> R$ ${dados.produto.preco}<br><br><i>Enviado para a Cloudflare!</i>`);
+                    document.getElementById('termoBusca').value = ""; // Limpa o campo
+                } else {
+                    mostrarStatus("erro", `❌ Ocorreu um erro: ${dados.mensagem}`);
+                }
+            } catch (erro) {
+                mostrarStatus("erro", "❌ Falha ao contactar o servidor local.");
+            } finally {
+                // Restaura o botão
+                btn.disabled = false;
+                btn.innerText = "🔎 Buscar e Publicar";
+            }
+        }
+
+        function mostrarStatus(tipo, texto) {
+            const statusBox = document.getElementById('status');
+            statusBox.style.display = 'block';
+            statusBox.className = tipo;
+            statusBox.innerHTML = texto;
+        }
+    </script>
+</body>
+
+</html>

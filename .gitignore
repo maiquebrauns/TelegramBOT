@@ -1,0 +1,4 @@
+node_modules/
+.env
+memoria_produtos.json
+memoria_pagina.json
