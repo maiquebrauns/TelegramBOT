@@ -45,7 +45,6 @@ categoriasAtivas.forEach(cat => {
             const dados = fs.readFileSync(cat.arquivoMemoria, 'utf8');
             cat.produtosEnviados = new Set(JSON.parse(dados));
         } else if (cat.id === 'tech' && fs.existsSync('./memoria_produtos.json')) {
-            // Migra o arquivo antigo de tech caso exista
             const dadosAntigos = fs.readFileSync('./memoria_produtos.json', 'utf8');
             cat.produtosEnviados = new Set(JSON.parse(dadosAntigos));
         }
@@ -73,7 +72,7 @@ function salvarMemoriaCategoria(cat) {
     }
 }
 
-// Configuração do navegador otimizado para Docker / Railway e Windows local
+// Configura navegador otimizado para Docker / Railway e Windows local
 async function iniciarNavegador() {
     return await puppeteer.launch({
         headless: "new",
@@ -85,9 +84,36 @@ async function iniciarNavegador() {
             '--disable-accelerated-2d-canvas',
             '--no-first-run',
             '--no-zygote',
-            '--disable-gpu'
+            '--disable-gpu',
+            '--window-size=1366,768'
         ]
     });
+}
+
+// Configura cabeçalhos realistas e injeta cookies da conta no navegador
+async function configurarPagina(page) {
+    await page.setViewport({ width: 1366, height: 768 });
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
+    await page.setExtraHTTPHeaders({
+        'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+        'sec-ch-ua': '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': '"Windows"'
+    });
+
+    if (ML_COOKIE) {
+        try {
+            const cookies = ML_COOKIE.split(';').map(c => {
+                const parts = c.trim().split('=');
+                const name = parts[0];
+                const value = parts.slice(1).join('=');
+                return { name, value, domain: '.mercadolivre.com.br', path: '/' };
+            }).filter(c => c.name && c.value);
+            if (cookies.length > 0) {
+                await page.setCookie(...cookies);
+            }
+        } catch (e) { }
+    }
 }
 
 // ==========================================
@@ -97,17 +123,22 @@ async function recarregarFilaCategoria(cat, page) {
     console.log(`\n🔍 [${cat.nome}] Recarregando fila a partir de: ${cat.paginaAtual}`);
     try {
         await page.goto(cat.paginaAtual, { waitUntil: 'domcontentloaded', timeout: 40000 });
+        console.log(`📄 [${cat.nome}] URL carregada: ${page.url()}`);
 
-        // Scroll suave para carregar os cartões
+        try {
+            await page.waitForSelector('.promotion-item, .poly-card, .ui-search-layout__item, .poly-component', { timeout: 8000 });
+        } catch (e) { }
+
+        // Scroll suave para acionar lazy-loading
         for (let i = 0; i < 5; i++) {
             try {
                 await page.evaluate(() => window.scrollBy(0, window.innerHeight));
             } catch (e) { }
-            await new Promise(r => setTimeout(r, 1200));
+            await new Promise(r => setTimeout(r, 1000));
         }
 
         const dadosPagina = await page.evaluate(() => {
-            const itens = Array.from(document.querySelectorAll('.promotion-item, .poly-card, .ui-search-layout__item'));
+            const itens = Array.from(document.querySelectorAll('.promotion-item, .poly-card, .ui-search-layout__item, .poly-component'));
             const listaProdutos = itens.map(el => {
                 let titulo = el.querySelector('.promotion-item__title, .poly-component__title, h2, h3, .ui-search-item__title')?.innerText || "";
                 if (!titulo) titulo = el.querySelector('img')?.getAttribute('alt') || "";
@@ -162,7 +193,7 @@ async function recarregarFilaCategoria(cat, page) {
 // ==========================================
 async function despacharUmaOferta(cat, browser) {
     const page = await browser.newPage();
-    await page.setViewport({ width: 1366, height: 768 });
+    await configurarPagina(page);
 
     try {
         if (!cat.fila || cat.fila.length === 0) {
@@ -171,7 +202,6 @@ async function despacharUmaOferta(cat, browser) {
 
         if (!cat.fila || cat.fila.length === 0) {
             console.log(`⏳ [${cat.nome}] Fila ainda vazia após tentativa de recarga.`);
-            await page.close();
             return;
         }
 
@@ -232,7 +262,6 @@ async function despacharUmaOferta(cat, browser) {
             console.log(`❌ [${cat.nome}] Falha ao extrair preços deste item. Pulando.`);
             cat.produtosEnviados.add(linkLimpo);
             salvarMemoriaCategoria(cat);
-            await page.close();
             return;
         }
 
@@ -267,7 +296,9 @@ async function despacharUmaOferta(cat, browser) {
     } catch (e) {
         console.error(`❌ [${cat.nome}] Erro ao despachar produto:`, e.message);
     } finally {
-        await page.close();
+        try {
+            if (!page.isClosed()) await page.close();
+        } catch (e) { }
     }
 }
 
@@ -362,7 +393,11 @@ async function cicloPrincipal() {
     } catch (erro) {
         console.error("❌ Erro crítico no ciclo do navegador:", erro.message);
     } finally {
-        if (browser) await browser.close();
+        if (browser) {
+            try {
+                await browser.close();
+            } catch (e) { }
+        }
         executandoCiclo = false;
         console.log(`💤 Ronda finalizada. Próxima execução em ${INTERVALO_SEGUNDOS} segundos...`);
     }

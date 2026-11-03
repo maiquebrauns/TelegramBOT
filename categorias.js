@@ -15,7 +15,7 @@ module.exports = [
         nome: "Tecnologia & Informática",
         chatId: "@promotudobr", // Cole o ID do grupo de Tech aqui (ex: "-1001234567890")
         ativa: true,
-        url: "https://www.mercadolivre.com.br/ofertas?container_id=MLB779362-1",
+        url: "https://www.mercadolivre.com.br/ofertas?category=MLB1000",
         palavrasChave: [
             'notebook', 'smartphone', 'celular', 'tv', 'smart', 'monitor', 'mouse',
             'teclado', 'headset', 'fone', 'ssd', 'placa', 'processador', 'memória',
