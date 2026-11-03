@@ -1,9 +1,11 @@
 {
   "name": "bot-scraper",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Robô de Scraping e Afiliados Mercado Livre 24/7",
+  "main": "robo-automatico.js",
   "scripts": {
+    "start": "node robo-automatico.js",
+    "painel": "node servidor.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

@@ -1,0 +1,10 @@
+node_modules
+npm-debug.log
+.git
+.gitignore
+.env
+memoria_*.json
+memoria_produtos.json
+memoria_pagina.json
+tela-sucesso.png
+teste-ml.html

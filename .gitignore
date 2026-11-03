@@ -1,4 +1,6 @@
 node_modules/
 .env
+memoria_*.json
 memoria_produtos.json
 memoria_pagina.json
+data/
