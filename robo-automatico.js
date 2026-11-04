@@ -14,8 +14,8 @@ const LISTA_CATEGORIAS = require('./categorias');
 const CHAVE_CLOUDFLARE = process.env.CHAVE_CLOUDFLARE || "csad987cqa9dn1mnxcLXdna";
 const WORKER_URL = process.env.WORKER_URL || "https://promo-bot.ofertasnomelibr.workers.dev/oferta/salvar";
 
-// Intervalo em milissegundos entre as rondas (Padrão: 60 segundos = 1 minuto)
-const INTERVALO_SEGUNDOS = parseInt(process.env.INTERVALO_SEGUNDOS || "60", 10);
+// Intervalo em milissegundos entre as rondas (Padrão: 240 segundos = 4 minutos)
+const INTERVALO_SEGUNDOS = parseInt(process.env.INTERVALO_SEGUNDOS || "240", 10);
 const TEMPO_ESPERA = INTERVALO_SEGUNDOS * 1000;
 
 // Modo de envio:
