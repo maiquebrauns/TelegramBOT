@@ -19,8 +19,8 @@ const INTERVALO_SEGUNDOS = parseInt(process.env.INTERVALO_SEGUNDOS || "240", 10)
 const TEMPO_ESPERA = INTERVALO_SEGUNDOS * 1000;
 
 // Modo de envio:
-// 'PARALELO': A cada minuto despacha 1 produto de CADA categoria ativa.
-// 'ROTATIVO': A cada minuto despacha 1 produto alternando entre as categorias.
+// 'PARALELO': A cada ronda despacha 1 produto de CADA categoria ativa.
+// 'ROTATIVO': A cada ronda despacha 1 produto alternando entre as categorias.
 const MODO_ENVIO = (process.env.MODO_ENVIO || 'PARALELO').toUpperCase();
 
 // Tokens de Afiliado Mercado Livre (Podem ser configurados no Railway)
@@ -51,10 +51,14 @@ categoriasAtivas.forEach(cat => {
 
         if (fs.existsSync(cat.arquivoPagina)) {
             const pUrl = fs.readFileSync(cat.arquivoPagina, 'utf8');
-            if (pUrl && pUrl.trim()) cat.paginaAtual = pUrl.trim();
-        } else if (cat.id === 'tech' && fs.existsSync('./memoria_pagina.json')) {
-            const pUrlAntiga = fs.readFileSync('./memoria_pagina.json', 'utf8');
-            if (pUrlAntiga && pUrlAntiga.trim()) cat.paginaAtual = pUrlAntiga.trim();
+            if (pUrl && pUrl.trim()) {
+                // Auto-correção: se a URL salva for a antiga com category= ou captcha, reseta para o feed oficial
+                if (pUrl.includes('category=MLB') || pUrl.includes('captcha/wall')) {
+                    cat.paginaAtual = cat.url;
+                } else {
+                    cat.paginaAtual = pUrl.trim();
+                }
+            }
         }
     } catch (e) {
         console.error(`⚠️ Erro ao restaurar memória da categoria ${cat.nome}:`, e.message);
@@ -123,7 +127,16 @@ async function recarregarFilaCategoria(cat, page) {
     console.log(`\n🔍 [${cat.nome}] Recarregando fila a partir de: ${cat.paginaAtual}`);
     try {
         await page.goto(cat.paginaAtual, { waitUntil: 'domcontentloaded', timeout: 40000 });
-        console.log(`📄 [${cat.nome}] URL carregada: ${page.url()}`);
+        const urlFinal = page.url();
+        console.log(`📄 [${cat.nome}] URL carregada: ${urlFinal}`);
+
+        // Se a página cair em captcha, auto-corrige voltando para o container oficial
+        if (urlFinal.includes('captcha/wall') || urlFinal.includes('account-verification')) {
+            console.log(`⚠️ [${cat.nome}] Captcha detectado na URL. Redirecionando para o feed oficial...`);
+            cat.paginaAtual = cat.url;
+            salvarMemoriaCategoria(cat);
+            return;
+        }
 
         try {
             await page.waitForSelector('.promotion-item, .poly-card, .ui-search-layout__item, .poly-component', { timeout: 8000 });
@@ -143,7 +156,28 @@ async function recarregarFilaCategoria(cat, page) {
                 let titulo = el.querySelector('.promotion-item__title, .poly-component__title, h2, h3, .ui-search-item__title')?.innerText || "";
                 if (!titulo) titulo = el.querySelector('img')?.getAttribute('alt') || "";
                 const link = el.querySelector('a')?.href || "";
-                return { titulo: titulo.toLowerCase(), link };
+
+                // Extração antecipada do preço e imagem direto do card do anúncio (como backup)
+                let precoCard = null;
+                const fracoes = el.querySelectorAll('.andes-money-amount__fraction');
+                if (fracoes.length > 0) {
+                    const ultimaFracao = fracoes[fracoes.length - 1].innerText.replace(/\./g, '');
+                    const centavosEl = el.querySelectorAll('.andes-money-amount__cents');
+                    const centavos = centavosEl.length > 0 ? centavosEl[centavosEl.length - 1].innerText.trim() : '00';
+                    precoCard = parseFloat(`${ultimaFracao}.${centavos}`);
+                }
+
+                let descontoCard = el.querySelector('.andes-money-amount__discount')?.innerText.trim() || null;
+                let imagemCard = el.querySelector('img')?.getAttribute('src') || el.querySelector('img')?.getAttribute('data-src') || null;
+
+                return {
+                    titulo: titulo.toLowerCase(),
+                    tituloOriginal: titulo.trim(),
+                    link,
+                    precoCard,
+                    descontoCard,
+                    imagemCard
+                };
             }).filter(item => item.titulo && item.link);
 
             const btnSeguinte = document.querySelector('li.andes-pagination__button--next a, .andes-pagination__link--next, a[title="Seguinte"]');
@@ -208,10 +242,15 @@ async function despacharUmaOferta(cat, browser) {
         const candidato = cat.fila.shift();
         const linkLimpo = candidato.link.split('?')[0];
 
-        console.log(`\n🎯 [${cat.nome}] Alvo selecionado: ${candidato.titulo}`);
+        console.log(`\n🎯 [${cat.nome}] Alvo selecionado: ${candidato.tituloOriginal || candidato.titulo}`);
         console.log(`🔗 Extraindo detalhes da página do produto...`);
 
         await page.goto(linkLimpo, { waitUntil: 'domcontentloaded', timeout: 35000 });
+
+        // Aguarda elementos de preço ou título carregarem
+        try {
+            await page.waitForSelector('.andes-money-amount, .ui-pdp-price__main-container, h1', { timeout: 6000 });
+        } catch (e) { }
 
         const dadosProduto = await page.evaluate(() => {
             const titulo = document.querySelector('h1')?.innerText.trim();
@@ -257,6 +296,21 @@ async function despacharUmaOferta(cat, browser) {
 
             return { titulo, preco, preco_original, desconto, link: window.location.href, imagem };
         });
+
+        // 🎯 SISTEMA BLINDADO DE FALLBACK: se a página do produto demorar a hidratar preços, usa os dados do cartão de oferta
+        if (!dadosProduto.preco && candidato.precoCard) {
+            console.log(`💡 [${cat.nome}] Preço extraído via card do anúncio: R$ ${candidato.precoCard}`);
+            dadosProduto.preco = candidato.precoCard;
+            if (!dadosProduto.desconto) dadosProduto.desconto = candidato.descontoCard;
+        }
+
+        if (!dadosProduto.titulo) {
+            dadosProduto.titulo = candidato.tituloOriginal || candidato.titulo;
+        }
+
+        if (!dadosProduto.imagem && candidato.imagemCard) {
+            dadosProduto.imagem = candidato.imagemCard;
+        }
 
         if (!dadosProduto || !dadosProduto.preco) {
             console.log(`❌ [${cat.nome}] Falha ao extrair preços deste item. Pulando.`);

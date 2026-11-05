@@ -3,19 +3,20 @@
 // ==========================================
 // - id: Identificador único da categoria
 // - nome: Nome exibido no Telegram / Logs
-// - chatId: ID do grupo/canal do Telegram exclusivo para essa categoria (ex: "-1001234567890").
-//           Se deixar vazio ou omitir, usará o canal padrão configurado no seu Cloudflare Worker!
+// - chatId: ID do grupo/canal do Telegram exclusivo para essa categoria (ex: "@promotudobr").
 // - ativa: true para rodar, false para pausar
-// - url: Link da categoria de ofertas no Mercado Livre
+// - url: Link do feed de ofertas no Mercado Livre
 // - palavrasChave: Termos para filtrar no título (deixe [] vazio para aceitar tudo)
+
+const URL_BASE_OFERTAS = "https://www.mercadolivre.com.br/ofertas?container_id=MLB779362-1";
 
 module.exports = [
     {
         id: "tech",
         nome: "Tecnologia & Informática",
-        chatId: "@promotudobr", // Cole o ID do grupo de Tech aqui (ex: "-1001234567890")
+        chatId: "@promotudobr",
         ativa: true,
-        url: "https://www.mercadolivre.com.br/ofertas?category=MLB1000",
+        url: URL_BASE_OFERTAS,
         palavrasChave: [
             'notebook', 'smartphone', 'celular', 'tv', 'smart', 'monitor', 'mouse',
             'teclado', 'headset', 'fone', 'ssd', 'placa', 'processador', 'memória',
@@ -25,31 +26,33 @@ module.exports = [
     {
         id: "games",
         nome: "Games & Consoles",
-        chatId: "@promotudogames", // Cole o ID do grupo de Games aqui
+        chatId: "@promotudogames",
         ativa: true,
-        url: "https://www.mercadolivre.com.br/ofertas?category=MLB1144",
+        url: URL_BASE_OFERTAS,
         palavrasChave: [
             'ps5', 'playstation', 'xbox', 'nintendo', 'switch', 'game', 'jogos',
-            'controle', 'dualsense', 'headset', 'gamer', 'cadeira gamer', 'console'
+            'controle', 'dualsense', 'headset', 'gamer', 'cadeira gamer', 'console',
+            'volante', 'teclado mecanico', 'mouse gamer', 'gamepad', 'joystick'
         ]
     },
     {
         id: "casa",
         nome: "Casa & Eletrodomésticos",
-        chatId: "@promotudoeletro", // Cole o ID do grupo de Casa aqui
+        chatId: "@promotudoeletro",
         ativa: true,
-        url: "https://www.mercadolivre.com.br/ofertas?category=MLB1574",
+        url: URL_BASE_OFERTAS,
         palavrasChave: [
             'airfryer', 'aspirador', 'cafeteira', 'geladeira', 'microondas', 'liquidificador',
-            'panela', 'batedeira', 'ventilador', 'ar condicionado', 'robô aspirador', 'purificador'
+            'panela', 'batedeira', 'ventilador', 'ar condicionado', 'robô aspirador', 'purificador',
+            'fritadeira', 'fogao', 'fogão', 'lavadora', 'ferro', 'batedeira', 'sanduicheira'
         ]
     },
     {
         id: "ferramentas",
         nome: "Ferramentas & Construção",
-        chatId: "@promotudoferramentas", // Cole o ID do grupo de Ferramentas aqui
+        chatId: "@promotudoferramentas",
         ativa: false,
-        url: "https://www.mercadolivre.com.br/ofertas?category=MLB1500",
+        url: URL_BASE_OFERTAS,
         palavrasChave: [
             'furadeira', 'parafusadeira', 'serra', 'esmerilhadeira', 'bosch', 'dewalt', 'makita', 'maleta', 'trena'
         ]
